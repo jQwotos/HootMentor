@@ -15,6 +15,7 @@ JOBS_FILE = "../data/job_names.csv"
 
 all_requirements_pat = r'Employment requirements</h3>(.*?)<h3>'
 li_pat = r'<li>(.*?)</li>'
+space_pat = r'[ ]{2,}'
 
 def _seperate_requirements(strData):
     # string -> list
@@ -88,6 +89,9 @@ def giantSearch(allJobs):
         logging.critical('There were %i unfound jobs of' % (len(unfoundJobs)))
         logging.critical(unfoundJobs)
 
+def _clean_text(data):
+    return re.sub(space_pat, ' ',data.replace(',', ''))
+
 def smartDownload():
     page = BeautifulSoup(
         requests.get(
@@ -100,13 +104,13 @@ def smartDownload():
         for item in table.findAll('tr'):
             tds = item.findAll('td')
             anchor = tds[1].find('a')
-            data = jobDetails(tds[0].text)
-            logging.info('Detaling %s' % (anchor.text))
+            data = jobDetails(tds[0].text.replace(',',''))
+            logging.info('Detaling %s' % (_clean_text(anchor.text)))
             row = "%s,%s,%s,%s,%s\n" % (
-                tds[0].text,
+                _clean_text(tds[0].text),
                 anchor.get('href'),
-                anchor.text,
-                tds[2].text,
+                _clean_text(anchor.text),
+                _clean_text(tds[2].text),
                 ','.join(data)
             )
             csv.write(row)
