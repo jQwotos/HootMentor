@@ -7,7 +7,6 @@ def _load_rel_skills():
     with open(positions_updated) as f:
         return f.readline().strip('\n').split(',')[4:]
 
-
 def _load_data():
     # Converts data from
     skills = _load_rel_skills()
@@ -35,14 +34,29 @@ def _load_data():
         }) for x in range(len(skills))
     ]
 
-
-def eliminate(has_skills, *rel_skills):
+def eliminate(has_skills, rel_skills):
     output = []
-    if rel_skills is None:
-        rel_skills = global_rel_skills
+    for x in rel_skills:
+        print('Trying to find %s' % x)
+        if x in has_skills:
+            output.append(0)
+        else:
+            output.append(1)
+    return output
 
-    for skill in has_skills:
-        if skill in rel_skills:
-            output.append(skill)
+'''
+def eliminate(has_skills, rel_skills):
+    output = []
+    for s in rel_skills:
+        val = None
+        for k, v in has_skills.items():
+            if s == rel_skills['s'] and v != 0:
+                val = v
+                break
+        if val is not None:
+            output.append(v)
+        else:
+            output.append(0)
 
     return output
+'''

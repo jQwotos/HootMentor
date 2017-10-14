@@ -1,9 +1,9 @@
 import os
 import logging
 
-DATA_FILE = '../data/positions.csv'
-POSITIONS_FILE = '../data/positions_updated.csv'
-JOBS_FILE = "../data/matching_jobs.csv"
+DATA_FILE = 'data/positions.csv'
+POSITIONS_FILE = 'data/positions_updated.csv'
+JOBS_FILE = "data/matching_jobs.csv"
 
 
 def soundex(word):
@@ -40,6 +40,57 @@ def custom_reqs(reqs):
                 'title': split[0:3],
                 'reqs': split[4:],
             })
+
+def databasify():
+    with open(JOBS_FILE) as f:
+        matching_jobs = [
+            l.strip('\n') for l in f
+        ]
+
+    with open(DATA_FILE) as f:
+        rows = [l.strip('\n') for l in f]
+        jobs = []
+
+        logging.info('Stage 1')
+        for j in rows:
+            split = j.split(',')
+            print(split[0:4])
+            if (split[2]) in matching_jobs:
+                jobs.append({
+                    'title': split[0:4],
+                    'reqs': split[4:],
+                })
+        logging.info('Stage 2')
+        reqs = []
+        for j in jobs:
+            for r in j['reqs']:
+                if r not in reqs:
+                    reqs.append(r)
+
+    with open(DATA_FILE) as f:
+        rows = [l.strip('\n') for l in f]
+        positions = []
+        for r in rows:
+            split = r.split(',')
+            skills = split[4:]
+            updatedSkills = []
+
+            for req in reqs:
+                if req in skills:
+                    updatedSkills.append(1)
+                else:
+                    updatedSkills.append(0)
+            positions.append({
+                'noc_code': split[0],
+                'link': split[1],
+                'title': split[2],
+                'proficiency': split[3],
+                'skills': updatedSkills,
+            })
+    return {
+        'positions': positions,
+        'skills': reqs,
+    }
 
 
 def simplify():
