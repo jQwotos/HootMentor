@@ -4,9 +4,6 @@ from bs4 import BeautifulSoup
 
 BASE_URL = 'https://www.google.ca/search'
 
-'''
-?q=this+is+a+quick+test
-'''
 
 def _scrape_item(data):
     urlBox = data.find('a')
