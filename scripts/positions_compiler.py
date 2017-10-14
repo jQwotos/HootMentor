@@ -43,6 +43,7 @@ def custom_reqs(reqs):
 
 
 def simplify():
+    '''
     with open(JOBS_FILE) as f:
         badChars = [' ', '\n']
         matching_jobs = [
@@ -50,6 +51,11 @@ def simplify():
             l.translate(
             maketrans("", "",),
             badChars)) for l in f
+        ]
+    '''
+    with open(JOBS_FILE) as f:
+        matching_jobs = [
+            l.strip('\n') for l in f
         ]
 
     with open(DATA_FILE) as f:
@@ -60,7 +66,7 @@ def simplify():
         for j in rows:
             split = j.split(',')
             print(split[0:4])
-            if sound(split[2]) in matching_jobs:
+            if (split[2]) in matching_jobs:
                 jobs.append({
                     'title': split[0:4],
                     'reqs': split[4:],
@@ -91,8 +97,7 @@ def simplify():
 
         logging.info('Stage 5')
         with open(POSITIONS_FILE, 'w+') as p:
-            row = '%s,%s,%s,%s\n' % (
-                'noc_code', 'link', 'title',
+            row = 'noc_code,link,title,rank,%s\n' % (
                 ','.join(reqs)
             )
             p.write(row)
