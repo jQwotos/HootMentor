@@ -1,4 +1,4 @@
-import rand.int)
+from random import randint
 
 data = [
     {
@@ -18,3 +18,10 @@ def generate(percentage):
     for m in data:
         if percentage < m.get('range')[1] and percentage > m.get('range')[0]:
             return m.get('message')[randint(0, len(m.get('message')))].replace("{{PERCENTAGE}}", percentage)
+
+def job_phrase(alternative, main):
+    return "A job similar to %s that's %i%% less likely to be automated is %s." % (
+        main.occupation,
+        main.automation_risk - alternative.automation_risk,
+        alternative.occupation,
+    )

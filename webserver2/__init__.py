@@ -7,10 +7,15 @@ from sqlalchemy import and_
 
 from fuzzywuzzy import fuzz
 
-#import empathetic
+from webserver2 import empathetic
+from chatbot.chatbot import Chatbot
+
+chatbot = Chatbot()
 
 app = Flask(__name__)
 db = SQLAlchemy(app)
+
+# chatbot =
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///main.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -32,6 +37,22 @@ def searchNMatch(strPosition):
     return match(search(strPosition))
 
 
+def fuzzySearch(strPosition):
+    positions = Position.query.all()
+    result = None
+    for pos in positions:
+        ratio = fuzz.ratio(pos.occupation, strPosition)
+        if (ratio > 85) and (result is None or ratio > result.get('ration')):
+            result = {
+                'ratio': ratio,
+                'obj': pos
+            }
+    return result.get('obj') if result is not None else None
+
+def fuzzySearchNMatch(strPosition):
+    return match(fuzzySearch(strPosition))
+
+
 def search(strPosition):
     return Position.query.filter(
         Position.occupation == strPosition
@@ -39,37 +60,64 @@ def search(strPosition):
 
 
 def match(position):
-    data = Position.query.filter(and_(
-        Position.group == position.group,
-    )).all()
-    output = []
-    for x in data:
-        if fuzz.ratio(x.level_of_education, position.level_of_education) > 80:
-            output.append(x)
-    return output
+    if position is not None:
+        return Position.query.filter(and_(
+            Position.group == position.group,
+            Position.level_of_education == position.level_of_education,
+            Position.occupation != position.occupation,
+        )).all()
+    else:
+        return None
+
 
 def sortMatches(matches):
-    return sorted(
-        matches,
-        key=lambda x: x.automation_risk,
-        reverse=False
-    )
+    if matches is not None:
+        return sorted(
+            matches,
+            key=lambda x: x.automation_risk,
+            reverse=False
+        )
+    else:
+        return None
 
 
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
-    return reply
+    data = request.form.get('response')
+    return chatbot.speak(data)
 
 
 @app.route('/job_recommender', methods=['POST'])
 def job_recommender():
     data = request.form.get('response')
-    matches = sortMatches(searchNMatch(data))
-    output = ""
-    for match in matches:
-        output += match.occupation + ","
-    output = output[:-1]
-    return output
+    original = fuzzySearch(data)
+    matches = sortMatches(match(original))
+    if matches is not None:
+        # If the person's job is in the database
+        # and can be matched to other jobs then
+        # we reply back with other jobs.
+        '''
+        output = ""
+        for match in matches:
+            output += match.occupation + ","
+        output = output[:-1]
+        return output
+        '''
+        output = {
+            'jobs':[],
+            'sentences':[],
+        }
+        for m in matches:
+            output['jobs'].append(m.occupation)
+            output['sentences'].append(empathetic.job_phrase(m, original))
+        return json.dumps(output)
+    else:
+        # Otherwise we just
+        # give them a random job
+        return json.dumps({
+            'jobs':[],
+            'sentences': ["Sorry, I couldn't find you an amazing match to your current job."]
+        })
 
 
 @app.route('/automation_percentage', methods=['POST'])
