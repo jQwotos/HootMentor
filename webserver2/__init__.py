@@ -1,6 +1,8 @@
 import logging
 import json
 
+from random import randint
+
 from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import and_
@@ -8,9 +10,9 @@ from sqlalchemy import and_
 from fuzzywuzzy import fuzz
 
 from webserver2 import empathetic
-# from ai_chatbot.chatbot import Chatbot
+from api_chatbot.chatbot import Chatbot
 
-# cb = Chatbot()
+cb = Chatbot()
 # cb.main('--test ['{}']')
 # cb.main('Daemon')
 # cb.main(['--modelTag', 'server', '--test', 'daemon', '--rootDir', chatbotPath])
@@ -44,7 +46,7 @@ def fuzzySearch(strPosition):
     positions = Position.query.all()
     result = None
     for pos in positions:
-        ratio = fuzz.ratio(pos.occupation, strPosition)
+        ratio = fuzz.token_sort_ratio(pos.occupation, strPosition)
         if (ratio > 85) and (result is None or ratio > result.get('ration')):
             result = {
                 'ratio': ratio,
@@ -87,12 +89,25 @@ def sortMatches(matches):
         return None
 
 
+
+def parse(query):
+    replacements = {
+        '{{SALARY}}':''
+    }
+
+
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
     data = request.form.get('response')
     #print(data)
     #return cb.daemonPredict(str(data))
+    reply = cb.speak(data)
+
     return cb.speak(data)
+
+def random_job():
+    data = Position.query.order_by(Position.automation_risk).limit(10).all()
+    return data[randint(0, len(data) - 1)]
 
 
 @app.route('/job_recommender', methods=['POST'])
@@ -115,15 +130,20 @@ def job_recommender():
     else:
         # Otherwise we just
         # give them a random job
+        job = random_job().occupation
         return json.dumps({
-            'jobs':[],
-            'sentences': ["Sorry, I couldn't find you an amazing match to your current job."]
+            'jobs':[job],
+            'sentences': ["I can say that %s has an extremly low chance of automation, if your interested in a different career."
+            % job],
         })
 
 
 @app.route('/automation_percentage', methods=['POST'])
 def automation_percentage():
     data = request.form.get('response')
-    position = search(data)
-    percentage = position.automation_risk()
-    return empathetic.generate(percentage)
+    position = fuzzySearch(data)
+    if position is not None:
+        percentage = position.automation_risk
+        return empathetic.generate(percentage)
+    else:
+        return("Sadly I can't seem to find your job.")
