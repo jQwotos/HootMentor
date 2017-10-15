@@ -8,9 +8,12 @@ from sqlalchemy import and_
 from fuzzywuzzy import fuzz
 
 from webserver2 import empathetic
-from chatbot.chatbot import Chatbot
+# from ai_chatbot.chatbot import Chatbot
 
-chatbot = Chatbot()
+# cb = Chatbot()
+# cb.main('--test ['{}']')
+# cb.main('Daemon')
+# cb.main(['--modelTag', 'server', '--test', 'daemon', '--rootDir', chatbotPath])
 
 app = Flask(__name__)
 db = SQLAlchemy(app)
@@ -61,10 +64,13 @@ def search(strPosition):
 
 def match(position):
     if position is not None:
+        # Position is from database
+        # position is the user's current job
         return Position.query.filter(and_(
             Position.group == position.group,
             Position.level_of_education == position.level_of_education,
             Position.occupation != position.occupation,
+            Position.automation_risk < position.automation_risk,
         )).all()
     else:
         return None
@@ -84,7 +90,9 @@ def sortMatches(matches):
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
     data = request.form.get('response')
-    return chatbot.speak(data)
+    #print(data)
+    #return cb.daemonPredict(str(data))
+    return cb.speak(data)
 
 
 @app.route('/job_recommender', methods=['POST'])
@@ -96,13 +104,6 @@ def job_recommender():
         # If the person's job is in the database
         # and can be matched to other jobs then
         # we reply back with other jobs.
-        '''
-        output = ""
-        for match in matches:
-            output += match.occupation + ","
-        output = output[:-1]
-        return output
-        '''
         output = {
             'jobs':[],
             'sentences':[],
@@ -125,4 +126,4 @@ def automation_percentage():
     data = request.form.get('response')
     position = search(data)
     percentage = position.automation_risk()
-    #return empathetic.generate(percentage)
+    return empathetic.generate(percentage)
