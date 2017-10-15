@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/rockliang/Desktop/project/hackathon/virtual_tutor/save/model/model.ckpt"
+all_model_checkpoint_paths: "/Users/rockliang/Desktop/project/hackathon/virtual_tutor/save/model/model.ckpt"
