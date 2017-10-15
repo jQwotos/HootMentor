@@ -49,3 +49,5 @@ def search(query):
         'html.parser'
     )
     result = _seperate_list(data)
+
+    

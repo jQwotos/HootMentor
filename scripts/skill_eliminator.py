@@ -43,20 +43,3 @@ def eliminate(has_skills, rel_skills):
         else:
             output.append(1)
     return output
-
-'''
-def eliminate(has_skills, rel_skills):
-    output = []
-    for s in rel_skills:
-        val = None
-        for k, v in has_skills.items():
-            if s == rel_skills['s'] and v != 0:
-                val = v
-                break
-        if val is not None:
-            output.append(v)
-        else:
-            output.append(0)
-
-    return output
-'''

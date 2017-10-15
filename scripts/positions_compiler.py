@@ -1,7 +1,7 @@
 import os
 import logging
 
-DATA_FILE = 'data/positions.csv'
+DATA_FILE = 'data/positions2.csv'
 POSITIONS_FILE = 'data/positions_updated.csv'
 JOBS_FILE = "data/matching_jobs.csv"
 

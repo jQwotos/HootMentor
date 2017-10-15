@@ -1,13 +1,13 @@
-# supress warning 
+# supress warning
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 import nltk
-from nltk.stem.lancaster import LancasterStemmer 
+from nltk.stem.lancaster import LancasterStemmer
 stemmer = LancasterStemmer()
 
-import numpy as np 
-import tflearn 
+import numpy as np
+import tflearn
 import tensorflow as tf
 import random
 
@@ -37,4 +37,3 @@ def DNN_network(train_x,train_y,n_epoch=1000,batch_size=10,show_metric=True):
     # Start training (apply gradient descent algorithm)
     model.fit(train_x, train_y, n_epoch=1000, batch_size=8, show_metric=True)
     model.save("./DNN/model.ckpt")
-
