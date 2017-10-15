@@ -1,18 +1,20 @@
 import logging
 import json
 from uuid import uuid4
+import hashlib
 
 from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 # from webserver.apps.models import db, Job, Skill, JobSkill
 
-#from scripts import skill_eliminator as se
-import skill_eliminator as se
+#from chatbot.chatbot import chatbot
+from scripts import skill_eliminator as se
 
 app = Flask(__name__)
 
 db = SQLAlchemy(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///main.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
@@ -41,7 +43,7 @@ class User(db.Model):
 
 class JobSkill(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
-    job = db.Column(db.String())
+    jobHash = db.Column(db.String())
     skillHash = db.Column(db.String())
     val = db.Column(db.Float())
 
@@ -52,6 +54,7 @@ class Job(db.Model):
     title = db.Column(db.String())
     link = db.Column(db.String())
     proficiency = db.Column(db.String())
+    noc_code = db.Column(db.String())
 
 
 def _generate_token():
@@ -102,24 +105,29 @@ def survey():
 @app.route('/job', methods=['POST'])
 def job():
     if request.method == 'POST':
-        data = json.loads(request.form.get('data'))
-        jobName = data.get('title')
+        jobName = str(request.form.get('data'))
         job = Job.query.filter_by(title=jobName).first()
-        objSkills = JobSkill.query.filter_by(job=job.uuid).all()
-        skills = [
+        objSkills = JobSkill.query.filter_by(
+            jobHash=hashlib.md5(job.title.encode()).hexdigest()
+        ).all()
+        skills = []
+        for x in objSkills:
+            if objSkills is None:
+                print('MASSIVE ERROR!')
+            else:
+                skills.append(
+                    Skill.query.filter_by(skillHash = x.skillHash).first().skillStr
+                )
+        udpatedSkills = [
             Skill.query.filter_by(
                 skillHash = x.skillHash
             ).first().skillStr for x in objSkills
         ]
-        skills = [{
-            's': skills[x].skillStr,
-            'v': obSkills[x].val,
-        } for x in range(len(objSkills))
-        ]
-        skills = se.eliminate(skills, se._load_rel_skills())
+        print(skills)
+        skills = se.eliminate(udpatedSkills, se._load_rel_skills())
 
         return json.dumps({
-            'test': 'Null'
+            'test': skills,
         })
 
 if __name__ == "__main__":
