@@ -46,12 +46,16 @@ def fuzzySearch(strPosition):
     positions = Position.query.all()
     result = None
     for pos in positions:
-        ratio = fuzz.token_sort_ratio(pos.occupation, strPosition)
-        if (ratio > 85) and (result is None or ratio > result.get('ration')):
+        ratio = fuzz.ratio(pos.occupation, strPosition)
+        print("The ratio for %s and %s is %s" % (pos.occupation.lower(), strPosition.lower(), str(ratio)))
+        if strPosition.lower() in pos.occupation.lower():
+            return pos
+        if ((ratio > 45) and (result is None or ratio > result.get('ratio')) or strPosition.lower() in (pos.occupation.lower())):
             result = {
                 'ratio': ratio,
                 'obj': pos
             }
+    if result is not None: print(result.get('obj').occupation)
     return result.get('obj') if result is not None else None
 
 def fuzzySearchNMatch(strPosition):
@@ -88,13 +92,29 @@ def sortMatches(matches):
     else:
         return None
 
+def getSalary(position):
+    return position.average_income
 
 
 def parse(query):
-    replacements = {
-        '{{SALARY}}':''
-    }
+    matching_pharses = [{
+        'phrase': '{{SALARY}}',
+        'function': getSalary,
+    }]
+    output = query
+    position_pat = r'\^(.*)\^'
 
+    positionRe = re.findall(position_pat, query)
+
+    if len(positionRe) > 0:
+        position = positionRe[0]
+        databasePosition = fuzzySearch(position)
+
+        if databasePosition is not None:
+            for phrase in matching_phrases:
+                output.replace(phrase.get('phrase'), phrase.get('function')(databasePosition))
+            return output
+    return cb.speak("This is a bad phrase.")
 
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
