@@ -1,5 +1,6 @@
 import logging
 import json
+import re
 
 from random import randint
 
@@ -47,7 +48,6 @@ def fuzzySearch(strPosition):
     result = None
     for pos in positions:
         ratio = fuzz.ratio(pos.occupation, strPosition)
-        print("The ratio for %s and %s is %s" % (pos.occupation.lower(), strPosition.lower(), str(ratio)))
         if strPosition.lower() in pos.occupation.lower():
             return pos
         if ((ratio > 45) and (result is None or ratio > result.get('ratio')) or strPosition.lower() in (pos.occupation.lower())):
@@ -97,24 +97,27 @@ def getSalary(position):
 
 
 def parse(query):
-    matching_pharses = [{
-        'phrase': '{{SALARY}}',
+    matching_phrases = [{
+        'phrase': 'SALARY',
         'function': getSalary,
     }]
     output = query
     position_pat = r'\^(.*)\^'
-
+    print(query)
     positionRe = re.findall(position_pat, query)
 
     if len(positionRe) > 0:
         position = positionRe[0]
+        output = re.sub(position_pat, '', output)
         databasePosition = fuzzySearch(position)
 
         if databasePosition is not None:
-            for phrase in matching_phrases:
-                output.replace(phrase.get('phrase'), phrase.get('function')(databasePosition))
+            #for phrase in matching_phrases:
+            if '{SALARY}' in output:
+                output = output.format(SALARY=("$%s" % str(databasePosition.average_income)))
+                # output.replace(phrase.get('phrase'), str(phrase.get('function')(databasePosition)))
             return output
-    return cb.speak("This is a bad phrase.")
+    return query
 
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
@@ -123,7 +126,7 @@ def chatbot():
     #return cb.daemonPredict(str(data))
     reply = cb.speak(data)
 
-    return cb.speak(data)
+    return parse(reply)
 
 def random_job():
     data = Position.query.order_by(Position.automation_risk).limit(10).all()
