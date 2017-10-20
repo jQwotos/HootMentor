@@ -1,244 +1,178 @@
-# Copyright 2015 Conchylicultor. All Rights Reserved.
-# Modifications copyright (C) 2016 Carlos Segura
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+import tensorflow as tf 
+import numpy as np 
+from six.moves import xrange
 
-"""
-Model to predict the next sentence given an input sequence
-"""
+class seq2seq_chatbot():
+    # dimension / shape of the word vector and nums of word will be n-gram
+    def __init__(self,dim_wordvec,n_words,dim_hidden,batch_size
+            ,n_encode_lstm_step,n_decode_lstm_step,bias_init_vector=None,lr=0.001):
+        '''
+            Seq2seq chatbot 
 
-import tensorflow as tf
-
-from chatbot.textdata import Batch
-
-
-class ProjectionOp:
-    """ Single layer perceptron
-    Project input tensor on the output dimension
-    """
-    def __init__(self, shape, scope=None, dtype=None):
-        """
-        Args:
-            shape: a tuple (input dim, output dim)
-            scope (str): encapsulate variables
-            dtype: the weights type
-        """
-        assert len(shape) == 2
-
-        self.scope = scope
-
-        # Projection on the keyboard
-        with tf.variable_scope('weights_' + self.scope):
-            self.W_t = tf.get_variable(
-                'weights',
-                shape,
-                # initializer=tf.truncated_normal_initializer()  # TODO: Tune value (fct of input size: 1/sqrt(input_dim))
-                dtype=dtype
-            )
-            self.b = tf.get_variable(
-                'bias',
-                shape[0],
-                initializer=tf.constant_initializer(),
-                dtype=dtype
-            )
-            self.W = tf.transpose(self.W_t)
-
-    def getWeights(self):
-        """ Convenience method for some tf arguments
-        """
-        return self.W, self.b
-
-    def __call__(self, X):
-        """ Project the output of the decoder into the vocabulary space
-        Args:
-            X (tf.Tensor): input value
-        """
-        with tf.name_scope(self.scope):
-            return tf.matmul(X, self.W) + self.b
-
-
-class Model:
-    """
-    Implementation of a seq2seq model.
-    Architecture:
-        Encoder/decoder
-        2 LTSM layers
-    """
-
-    def __init__(self, args, textData):
-        """
-        Args:
-            args: parameters of the model
-            textData: the dataset object
-        """
-        print("Model creation...")
-
-        self.textData = textData  # Keep a reference on the dataset
-        self.args = args  # Keep track of the parameters of the model
-        self.dtype = tf.float32
-
-        # Placeholders
-        self.encoderInputs  = None
-        self.decoderInputs  = None  # Same that decoderTarget plus the <go>
-        self.decoderTargets = None
-        self.decoderWeights = None  # Adjust the learning to the target sentence size
-
-        # Main operators
-        self.lossFct = None
-        self.optOp = None
-        self.outputs = None  # Outputs of the network, list of probability for each words
-
-        # Construct the graphs
-        self.buildNetwork()
-
-    def buildNetwork(self):
-        """ Create the computational graph
-        """
-
-        # TODO: Create name_scopes (for better graph visualisation)
-        # TODO: Use buckets (better perfs)
-
-        # Parameters of sampled softmax (needed for attention mechanism and a large vocabulary size)
-        outputProjection = None
-        # Sampled softmax only makes sense if we sample less than vocabulary size.
-        if 0 < self.args.softmaxSamples < self.textData.getVocabularySize():
-            outputProjection = ProjectionOp(
-                (self.textData.getVocabularySize(), self.args.hiddenSize),
-                scope='softmax_projection',
-                dtype=self.dtype
-            )
-
-            def sampledSoftmax(labels, inputs):
-                labels = tf.reshape(labels, [-1, 1])  # Add one dimension (nb of true classes, here 1)
-
-                # We need to compute the sampled_softmax_loss using 32bit floats to
-                # avoid numerical instabilities.
-                localWt     = tf.cast(outputProjection.W_t,             tf.float32)
-                localB      = tf.cast(outputProjection.b,               tf.float32)
-                localInputs = tf.cast(inputs,                           tf.float32)
-
-                return tf.cast(
-                    tf.nn.sampled_softmax_loss(
-                        localWt,  # Should have shape [num_classes, dim]
-                        localB,
-                        labels,
-                        localInputs,
-                        self.args.softmaxSamples,  # The number of classes to randomly sample per batch
-                        self.textData.getVocabularySize()),  # The number of classes
-                    self.dtype)
-
-        # Creation of the rnn cell
-        def create_rnn_cell():
-            encoDecoCell = tf.contrib.rnn.BasicLSTMCell(  # Or GRUCell, LSTMCell(args.hiddenSize)
-                self.args.hiddenSize,
-            )
-            if not self.args.test:  # TODO: Should use a placeholder instead
-                encoDecoCell = tf.contrib.rnn.DropoutWrapper(
-                    encoDecoCell,
-                    input_keep_prob=1.0,
-                    output_keep_prob=self.args.dropout
-                )
-            return encoDecoCell
-        encoDecoCell = tf.contrib.rnn.MultiRNNCell(
-            [create_rnn_cell() for _ in range(self.args.numLayers)],
-        )
-
-        # Network input (placeholders)
-
-        with tf.name_scope('placeholder_encoder'):
-            self.encoderInputs  = [tf.placeholder(tf.int32,   [None, ]) for _ in range(self.args.maxLengthEnco)]  # Batch size * sequence length * input dim
-
-        with tf.name_scope('placeholder_decoder'):
-            self.decoderInputs  = [tf.placeholder(tf.int32,   [None, ], name='inputs') for _ in range(self.args.maxLengthDeco)]  # Same sentence length for input and output (Right ?)
-            self.decoderTargets = [tf.placeholder(tf.int32,   [None, ], name='targets') for _ in range(self.args.maxLengthDeco)]
-            self.decoderWeights = [tf.placeholder(tf.float32, [None, ], name='weights') for _ in range(self.args.maxLengthDeco)]
-
-        # Define the network
-        # Here we use an embedding model, it takes integer as input and convert them into word vector for
-        # better word representation
-        decoderOutputs, states = tf.contrib.legacy_seq2seq.embedding_rnn_seq2seq(
-            self.encoderInputs,  # List<[batch=?, inputDim=1]>, list of size args.maxLength
-            self.decoderInputs,  # For training, we force the correct output (feed_previous=False)
-            encoDecoCell,
-            self.textData.getVocabularySize(),
-            self.textData.getVocabularySize(),  # Both encoder and decoder have the same number of class
-            embedding_size=self.args.embeddingSize,  # Dimension of each word
-            output_projection=outputProjection.getWeights() if outputProjection else None,
-            feed_previous=bool(self.args.test)  # When we test (self.args.test), we use previous output as next input (feed_previous)
-        )
-
-        # TODO: When the LSTM hidden size is too big, we should project the LSTM output into a smaller space (4086 => 2046): Should speed up
-        # training and reduce memory usage. Other solution, use sampling softmax
-
-        # For testing only
-        if self.args.test:
-            if not outputProjection:
-                self.outputs = decoderOutputs
+            @param
+                dim_wordvec :dimension of word vectors 
+                n_words : nums of words that will be embedded 
+                dim_hidden: dimension of hidden layers
+                batch_size: batch size that fit into the placeholder 
+                n_encode_lstm_step: step of encoding 
+                n_decode_lstm_step: step of decoding 
+                bias_init_vecotr: bias condition flag 
+                lr: learning rate
+            @ouput
+                A seq2seq model
+        '''
+        # initializes the parameters
+        self.dim_wordvec = dim_wordvec
+        self.dim_hidden = dim_hidden
+        self.batch_size = batch_size
+        self.n_words = n_words
+        self.n_encode_lstm_step = n_encode_lstm_step
+        self.n_decode_lstm_step = n_decode_lstm_step
+        self.lr = lr
+        
+        # initializes the random word vector
+        with tf.device("/cpu:0"):
+            self.Wemb = tf.Variable(tf.random_uniform([n_words, dim_hidden], -0.1, 0.1), name='Weight_embedd_bias')
+        # Generate the lstm cell
+        self.lstm1 = tf.contrib.rnn.BasicLSTMCell(dim_hidden,state_is_tuple=True)
+        self.lstm2 = tf.contrib.rnn.BasicLSTMCell(dim_hidden, state_is_tuple=True)
+        
+        # generate randomizes words vectors 
+        with tf.name_scope("encode_vector"):
+            self.encode_vector_W = tf.Variable(tf.random_uniform([ dim_wordvec, dim_hidden],- 0.1, 0.1),name='weight')
+            self.encode_vector_b = tf.Variable(tf.zeros([dim_hidden]), name='biase')
+        
+        # generate embedded weights vector
+        with tf.name_scope("embedded_word"):
+            self.embed_word_W = tf.Variable(tf.random_uniform([dim_hidden,n_words],-0.1 ,0.1),name='weights')
+            if bias_init_vector is not None:
+                self.embed_word_b = tf.Variable(bias_init_vector.astype(np.float32), name='embed_word_b')
             else:
-                self.outputs = [outputProjection(output) for output in decoderOutputs]
+                self.embed_word_b = tf.Variable(tf.zeros([n_words]), name='embed_word_b')
+    
+    def graph_model(self):
+        with tf.name_scope("Seq2Seq"):
+            word_vecotors = tf.placeholder(tf.float32, [ self.batch_size,self.n_encode_lstm_step,self.dim_wordvec])
+            caption = tf.placeholder(tf.int32, [self.batch_size, self.n_decode_lstm_step+1])
+            caption_mask = tf.placeholder(tf.float32, [self.batch_size, self.n_decode_lstm_step+1])
 
-            # TODO: Attach a summary to visualize the output
+            word_vectors_flat = tf.reshape(word_vectors, [-1, self.dim_wordvec])
+            wordvec_emb = tf.nn.xw_plus_b(word_vectors_flat, self.encode_vector_W, self.encode_vector_b ) # (batch_size*n_encode_lstm_step, dim_hidden)
+            wordvec_emb = tf.reshape(wordvec_emb, [self.batch_size, self.n_encode_lstm_step, self.dim_hidden])
 
-        # For training only
-        else:
-            # Finally, we define the loss function
-            self.lossFct = tf.contrib.legacy_seq2seq.sequence_loss(
-                decoderOutputs,
-                self.decoderTargets,
-                self.decoderWeights,
-                self.textData.getVocabularySize(),
-                softmax_loss_function= sampledSoftmax if outputProjection else None  # If None, use default SoftMax
-            )
-            tf.summary.scalar('loss', self.lossFct)  # Keep track of the cost
+            state1 = tf.zeros([self.batch_size, self.lstm1.state_size])
+            state2 = tf.zeros([self.batch_size, self.lstm2.state_size])
+            padding = tf.zeros([self.batch_size, self.dim_hidden])
 
-            # Initialize the optimizer
-            opt = tf.train.AdamOptimizer(
-                learning_rate=self.args.learningRate,
-                beta1=0.9,
-                beta2=0.999,
-                epsilon=1e-08
-            )
-            self.optOp = opt.minimize(self.lossFct)
+            probs = []
+            entropies = []
+            loss = 0.0
+            ##############################  Encoding Stage ##################################
+            for i in range(0, self.n_encode_lstm_step):
+                if i > 0:
+                    tf.get_variable_scope().reuse_variables()
 
-    def step(self, batch):
-        """ Forward/training step operation.
-        Does not perform run on itself but just return the operators to do so. Those have then to be run
-        Args:
-            batch (Batch): Input data on testing mode, input and target on output mode
-        Return:
-            (ops), dict: A tuple of the (training, loss) operators or (outputs,) in testing mode with the associated feed dictionary
-        """
+                with tf.variable_scope("LSTM1"):
+                    output1, state1 = self.lstm1(wordvec_emb[:, i, :], state1)
 
-        # Feed the dictionary
-        feedDict = {}
-        ops = None
+                with tf.variable_scope("LSTM2"):
+                    output2, state2 = self.lstm2(tf.concat([padding, output1], 1), state2)
 
-        if not self.args.test:  # Training
-            for i in range(self.args.maxLengthEnco):
-                feedDict[self.encoderInputs[i]]  = batch.encoderSeqs[i]
-            for i in range(self.args.maxLengthDeco):
-                feedDict[self.decoderInputs[i]]  = batch.decoderSeqs[i]
-                feedDict[self.decoderTargets[i]] = batch.targetSeqs[i]
-                feedDict[self.decoderWeights[i]] = batch.weights[i]
+            ############################# Decoding Stage ######################################
+            for i in range(0, self.n_decode_lstm_step):
+                with tf.device("/cpu:0"):
+                    current_embed = tf.nn.embedding_lookup(self.Wemb, caption[:, i])
 
-            ops = (self.optOp, self.lossFct)
-        else:  # Testing (batchSize == 1)
-            for i in range(self.args.maxLengthEnco):
-                feedDict[self.encoderInputs[i]]  = batch.encoderSeqs[i]
-            feedDict[self.decoderInputs[0]]  = [self.textData.goToken]
+                tf.get_variable_scope().reuse_variables()
 
-            ops = (self.outputs,)
+                with tf.variable_scope("LSTM1"):
+                    output1, state1 = self.lstm1(padding, state1)
 
-        # Return one pass operator
-        return ops, feedDict
+                with tf.variable_scope("LSTM2"):
+                    output2, state2 = self.lstm2(tf.concat([current_embed, output1], 1), state2)
+
+                labels = tf.expand_dims(caption[:, i+1], 1)
+                indices = tf.expand_dims(tf.range(0, self.batch_size, 1), 1)
+                concated = tf.concat([indices, labels], 1)
+                onehot_labels = tf.sparse_to_dense(concated, tf.stack([self.batch_size, self.n_words]), 1.0, 0.0)
+
+                logit_words = tf.nn.xw_plus_b(output2, self.embed_word_W, self.embed_word_b)
+                cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit_words, labels=onehot_labels)
+                cross_entropy = cross_entropy * caption_mask[:, i]
+                entropies.append(cross_entropy)
+                probs.append(logit_words)
+
+                current_loss = tf.reduce_sum(cross_entropy)/self.batch_size
+                loss = loss + current_loss
+
+                # tensorboard adding value 
+                tf.scalar_summary("sequence_loss",loss)
+                tf.scalar_summary("sequence_entropies",entropies)
+
+            with tf.variable_scope(tf.get_variable_scope(), reuse=False): 
+                # train_op = tf.train.RMSPropOptimizer(self.lr).minimize(loss)
+                # train_op = tf.train.GradientDescentOptimizer(self.lr).minimize(loss)
+                train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
+
+            inter_value = {
+                'probs': probs,
+                'entropies': entropies
+            }
+        
+        return train_op, loss, word_vectors, caption, caption_mask, inter_value
+    
+    def loop_function():
+        pass
+
+    def build_generator(self):
+        with tf.name_scope("Sequence_Generator"):
+            word_vectors = tf.placeholder(tf.float32, [1, self.n_encode_lstm_step, self.dim_wordvec])
+
+            word_vectors_flat = tf.reshape(word_vectors, [-1, self.dim_wordvec])
+            wordvec_emb = tf.nn.xw_plus_b(word_vectors_flat, self.encode_vector_W, self.encode_vector_b)
+            wordvec_emb = tf.reshape(wordvec_emb, [1, self.n_encode_lstm_step, self.dim_hidden])
+            
+            state1 = tf.zeros([1, self.lstm1.output_size*2])
+            state2 = tf.zeros([1, self.lstm2.output_size*2])
+            padding = tf.zeros([1, self.dim_hidden])
+
+            generated_words = []
+
+            probs = []
+            embeds = []
+
+            for i in xrange(self.n_encode_lstm_step):
+                if i > 0:
+                    tf.get_variable_scope().reuse_variables()
+                print (wordvec_emb[:,i,:])
+                # with tf.variable_scope("LSTM1"):
+                #     output1, state1 = self.lstm1(wordvec_emb[:, i, :], state1)
+
+        #         with tf.variable_scope("LSTM2"):
+        #             output2, state2 = self.lstm2(tf.concat([padding, output1], 1), state2)
+
+        #     for i in range(0, self.n_decode_lstm_step):
+        #         tf.get_variable_scope().reuse_variables()
+
+        #         if i == 0:
+        #             with tf.device('/cpu:0'):
+        #                 current_embed = tf.nn.embedding_lookup(self.Wemb, tf.ones([1], dtype=tf.int64))
+
+        #         with tf.variable_scope("LSTM1"):
+        #             output1, state1 = self.lstm1(padding, state1)
+
+        #         with tf.variable_scope("LSTM2"):
+        #             output2, state2 = self.lstm2(tf.concat([current_embed, output1], 1), state2)
+
+        #         logit_words = tf.nn.xw_plus_b(output2, self.embed_word_W, self.embed_word_b)
+        #         max_prob_index = tf.argmax(logit_words, 1)[0]
+        #         generated_words.append(max_prob_index)
+        #         probs.append(logit_words)
+
+        #         with tf.device("/cpu:0"):
+        #             current_embed = tf.nn.embedding_lookup(self.Wemb, max_prob_index)
+        #             current_embed = tf.expand_dims(current_embed, 0)
+
+        #         embeds.append(current_embed)
+
+        # return word_vectors, generated_words, probs, embeds
