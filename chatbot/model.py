@@ -67,18 +67,18 @@ class seq2seq_chatbot():
         self.lstm2 = tf.contrib.rnn.BasicLSTMCell(dim_hidden, state_is_tuple=False)
         
         # generate randomizes words vectors 
-        with tf.name_scope("encode_vector"):
-            self.encode_vector_W = tf.Variable(tf.random_uniform([ dim_wordvec, dim_hidden],- 0.1, 0.1),name='weight')
-            self.encode_vector_b = tf.Variable(tf.zeros([dim_hidden]), name='biase')
         
-        # generate embedded weights vector
-        with tf.name_scope("embedded_word"):
-            self.embed_word_W = tf.Variable(tf.random_uniform([dim_hidden,n_words],-0.1 ,0.1),name='weights')
-            if bias_init_vector is not None:
-                self.embed_word_b = tf.Variable(bias_init_vector.astype(np.float32), name='embed_word_b')
-            else:
-                self.embed_word_b = tf.Variable(tf.zeros([n_words]), name='embed_word_b')
+        self.encode_vector_W = tf.Variable(tf.random_uniform([ dim_wordvec, dim_hidden],- 0.1, 0.1),name='weight')
+        self.encode_vector_b = tf.Variable(tf.zeros([dim_hidden]), name='biase')
     
+        # generate embedded weights vector
+        
+        self.embed_word_W = tf.Variable(tf.random_uniform([dim_hidden,n_words],-0.1 ,0.1),name='weights')
+        if bias_init_vector is not None:
+            self.embed_word_b = tf.Variable(bias_init_vector.astype(np.float32), name='embed_word_b')
+        else:
+            self.embed_word_b = tf.Variable(tf.zeros([n_words]), name='embed_word_b')
+
     def graph_model(self):
         with tf.name_scope("Seq2Seq"):
             word_vecotors = tf.placeholder(tf.float32, [ self.batch_size,self.n_encode_lstm_step,self.dim_wordvec])

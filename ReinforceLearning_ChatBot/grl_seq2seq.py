@@ -38,7 +38,7 @@ def _extract_argmax_and_embed(embedding, output_projection=None, update_embeddin
   """
   def loop_function(prev, _):
     if output_projection is not None:
-      prev = nn_ops.xw_plus_b(
+      prev = nn_ops.xw_plus_b(              # linear soft_max calculate the previous projection
           prev, output_projection[0], output_projection[1])
     prev_symbol = math_ops.argmax(prev, 1)
     # Note that gradients will not propagate through the second parameter of
@@ -50,13 +50,13 @@ def _extract_argmax_and_embed(embedding, output_projection=None, update_embeddin
   return loop_function
 
 
-def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,
-                scope=None):
+def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,scope=None):
   with variable_scope.variable_scope(scope or "rnn_decoder"):
     state = initial_state
     outputs = []
     prev = None
     for i, inp in enumerate(decoder_inputs):
+      # for previous and looking for previous symbol is enable
       if loop_function is not None and prev is not None:
         with variable_scope.variable_scope("loop_function", reuse=True):
           inp = loop_function(prev, i)

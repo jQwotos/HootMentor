@@ -117,7 +117,7 @@ def basic_rnn_seq2seq(
         It is a 2D Tensor of shape [batch_size x cell.state_size].
   """
   with variable_scope.variable_scope(scope or "basic_rnn_seq2seq"):
-    _, enc_state = rnn.rnn(cell, encoder_inputs, dtype=dtype)
+    _, enc_state = rnn.static_qrnn(cell, encoder_inputs, dtype=dtype)
     return rnn_decoder(decoder_inputs, enc_state, cell)
 
 
@@ -149,7 +149,8 @@ def tied_rnn_seq2seq(encoder_inputs, decoder_inputs, cell,
   """
   with variable_scope.variable_scope("combined_tied_rnn_seq2seq"):
     scope = scope or "tied_rnn_seq2seq"
-    _, enc_state = rnn.rnn(
+    #creating an rnn with bin tie
+    _, enc_state = rnn.static_rnn(
         cell, encoder_inputs, dtype=dtype, scope=scope)
     variable_scope.get_variable_scope().reuse_variables()
     return rnn_decoder(decoder_inputs, enc_state, cell,
@@ -442,19 +443,17 @@ def attention_decoder(decoder_inputs,
   if output_size is None:
     output_size = cell.output_size
 
-  with variable_scope.variable_scope(
-      scope or "attention_decoder", dtype=dtype) as scope:
+  with variable_scope.variable_scope(scope or "attention_decoder", dtype=dtype) as scope:
     dtype = scope.dtype
 
-    batch_size = array_ops.shape(decoder_inputs[0])[0]  # Needed for reshaping.
+    batch_size = tf.shape(decoder_inputs[0])[0]  # Needed for reshaping.
     attn_length = attention_states.get_shape()[1].value
     if attn_length is None:
       attn_length = shape(attention_states)[1]
     attn_size = attention_states.get_shape()[2].value
 
     # To calculate W1 * h_t we use a 1-by-1 convolution, need to reshape before.
-    hidden = array_ops.reshape(
-        attention_states, [-1, attn_length, 1, attn_size])
+    hidden = tf.reshape(attention_states, [-1, attn_length, 1, attn_size])
     hidden_features = []
     v = []
     attention_vec_size = attn_size  # Size of query vectors for attention.
@@ -637,7 +636,7 @@ def embedding_attention_seq2seq(encoder_inputs,
     # Encoder.
     encoder_cell = rnn_cell.EmbeddingWrapper(cell, embedding_classes=num_encoder_symbols,
                                              embedding_size=embedding_size)
-    encoder_outputs, encoder_state = rnn.rnn(encoder_cell, encoder_inputs, dtype=dtype)
+    encoder_outputs, encoder_state = rnn.static_rnn(encoder_cell, encoder_inputs, dtype=dtype)
 
     # First calculate a concatenation of encoder outputs to put attention on.
     top_states = [array_ops.reshape(e, [-1, 1, cell.output_size])
