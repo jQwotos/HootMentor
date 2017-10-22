@@ -1,0 +1,27 @@
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /_ah/api/.*
+  script: api.api
+
+libraries:
+- name: jinja2
+  version: latest
+- name: lxml
+  version: latest
+- name: pycrypto
+  version: latest
+- name: ssl
+  version: latest
+
+env_variables:
+  ENDPOINTS_SERVICE_NAME: hoot-mentor.appspot.com
+  ENDPOINTS_SERVICE_VERSION: 2017-10-21r0
+
+skip_files:
+- ^chatbot/*
+- ^recommandation/*
+- ^ReinforceLearning_ChatBot/*
+- ^.git/*
