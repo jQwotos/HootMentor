@@ -1,5 +1,22 @@
 # HootMentor
 
+<!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [HootMentor](#hootmentor)
+	- [Getting Started](#getting-started)
+		- [Prerequisites](#prerequisites)
+		- [Installing](#installing)
+	- [Deployment](#deployment)
+	- [Authors](#authors)
+	- [License](#license)
+	- [Documentation](#documentation)
+		- [API Access](#api-access)
+			- [```/_ah/api/jobSearch/v1/jobSearch/echo```](#ahapijobsearchv1jobsearchecho)
+			- [```/_ah/api/jobSearch/v1/jobSearch/findSimilar```](#ahapijobsearchv1jobsearchfindsimilar)
+			- [```/_ah/api/jobSearch/v1/jobSearch/marketReportDetails```](#ahapijobsearchv1jobsearchmarketreportdetails)
+
+<!-- /TOC -->
+
 ## Getting Started
 
 ### Prerequisites
@@ -57,7 +74,67 @@ Returns
 - Example CURL request
   - Request
   ```
-  curl -H "Content-Type: application/json" -X POST -d '{"content":"cashier"}' localhost:8080/_ah/api/jobSearch/v1/jobSearch/findSimilar
+  curl -H "Content-Type: application/json" -X POST -d '{"content":"cashier"}' localhost:8080/_ah/api/jobSearch/<!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [HootMentor](#hootmentor)
+	- [Getting Started](#getting-started)
+		- [Prerequisites](#prerequisites)
+		- [Installing](#installing)
+	- [Deployment](#deployment)
+	- [Authors](#authors)
+	- [License](#license)
+	- [Documentation](#documentation)
+		- [API Access](#api-access)
+			- [```/_ah/api/jobSearch/v1/jobSearch/echo```](#ahapijobsearchv1jobsearchecho)
+			- [```/_ah/api/jobSearch/v1/jobSearch/findSimilar```](#ahapijobsearchv1jobsearchfindsimilar)
+			- [```/_ah/api/jobSearch/v1/jobSearch/marketReportDetails```](#ahapijobsearchv1jobsearchmarketreportdetails)
+
+<!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [HootMentor](#hootmentor)
+	- [Getting Started](#getting-started)
+		- [Prerequisites](#prerequisites)
+		- [Installing](#installing)
+	- [Deployment](#deployment)
+	- [Authors](#authors)
+	- [License](#license)
+	- [Documentation](#documentation)
+		- [API Access](#api-access)
+			- [```/_ah/api/jobSearch/v1/jobSearch/echo```](#ahapijobsearchv1jobsearchecho)
+			- [```/_ah/api/jobSearch/v1/jobSearch/findSimilar```](#ahapijobsearchv1jobsearchfindsimilar)
+			- [```/_ah/api/jobSearch/v1/jobSearch/marketReportDetails```](#ahapijobsearchv1jobsearchmarketreportdetails)
+
+<!-- /TOC --> TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [HootMentor](#hootmentor)
+	- [Getting Started](#getting-started)
+		- [Prerequisites](#prerequisites)
+		- [Installing](#installing)
+	- [Deployment](#deployment)
+	- [Authors](#authors)
+	- [License](#license)
+	- [Documentation](#documentation)
+		- [API Access](#api-access)
+			- [```/_ah/api/jobSearch/v1/jobSearch/echo```](#ahapijobsearchv1jobsearchecho)
+			- [```/_ah/api/jobSearch/v1/jobSearch/findSimilar```](#ahapijobsearchv1jobsearchfindsimilar)
+			- [```/_ah/api/jobSearch/v1/jobSearch/marketReportDetails```](#ahapijobsearchv1jobsearchmarketreportdetails)
+
+<!-- /TOC --><!-- TOC depthFrom:1 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
+
+- [HootMentor](#hootmentor)
+	- [Getting Started](#getting-started)
+		- [Prerequisites](#prerequisites)
+		- [Installing](#installing)
+	- [Deployment](#deployment)
+	- [Authors](#authors)
+	- [License](#license)
+	- [Documentation](#documentation)
+		- [API Access](#api-access)
+			- [```/_ah/api/jobSearch/v1/jobSearch/echo```](#ahapijobsearchv1jobsearchecho)
+			- [```/_ah/api/jobSearch/v1/jobSearch/findSimilar```](#ahapijobsearchv1jobsearchfindsimilar)
+			- [```/_ah/api/jobSearch/v1/jobSearch/marketReportDetails```](#ahapijobsearchv1jobsearchmarketreportdetails)
+
+<!-- /TOC -->v1/jobSearch/findSimilar
   ```
 
   - Response (may be changed)
