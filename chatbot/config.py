@@ -6,9 +6,9 @@ filters = "+++$+++"
 all_words_path = './data/all_words.txt'
 
 # training parameters 
-CHECKPOINT = True
-train_model_path = 'model'
-train_model_name = 'model-55'
+CHECKPOINT = False
+train_model_path = 'saver/RL'
+train_model_name = 'model-56-3000'
 start_epoch = 56
 start_batch = 0
 batch_size = 25

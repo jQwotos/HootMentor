@@ -81,7 +81,7 @@ class seq2seq_chatbot():
 
     def graph_model(self):
         with tf.name_scope("Seq2Seq"):
-            word_vecotors = tf.placeholder(tf.float32, [ self.batch_size,self.n_encode_lstm_step,self.dim_wordvec])
+            word_vectors = tf.placeholder(tf.float32, [ self.batch_size,self.n_encode_lstm_step,self.dim_wordvec])
             caption = tf.placeholder(tf.int32, [self.batch_size, self.n_decode_lstm_step+1])
             caption_mask = tf.placeholder(tf.float32, [self.batch_size, self.n_decode_lstm_step+1])
 

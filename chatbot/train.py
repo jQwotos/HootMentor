@@ -314,7 +314,7 @@ def train(training_type=config.training_type):
 
     r_wordtoix, r_ixtoword, r_bias_init_vector = data_parser.pre_build_word_vocab(word_count_threshold=r_word_count_threshold)
     with g2.as_default():
-        reversed_model = Seq2Seq_chatbot(
+        reversed_model = seq2seq_chatbot(
             dim_wordvec=dim_wordvec,
             n_words=len(r_wordtoix),
             dim_hidden=dim_hidden,
