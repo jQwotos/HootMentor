@@ -6,17 +6,20 @@ filters = "+++$+++"
 all_words_path = './data/all_words.txt'
 
 # training parameters 
-CHECKPOINT = False
+
 train_model_path = 'saver/model/RL/'
 train_model_name = 'model-RL'
+
+save_model_path= 'ouput/'
+
 start_epoch = 56
 start_batch = 0
 batch_size = 25
 
 # for RL training
 training_type = 'pg' # 'normal' for seq2seq training, 'pg' for policy gradient
-reversed_model_path = 'Adam_encode22_decode22_reversed-maxlen22_lr0.0001_batch25_wordthres6'
-reversed_model_name = 'model-63'
+reversed_model_path = 'saver/model/reversed'
+reversed_model_name = 'mode-Reversed'
 
 # data reader shuffle index list
 load_list = False
