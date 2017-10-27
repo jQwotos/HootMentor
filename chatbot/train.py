@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '5' 
 
 import time
 import sys
@@ -113,6 +113,7 @@ def refine(data):
     return data
 
 def make_batch_X(batch_X, n_encode_lstm_step, dim_wordvec, word_vector, noise=False):
+
     for i in range(len(batch_X)):
         batch_X[i] = [word_vector[w] if w in word_vector else np.zeros(dim_wordvec) for w in batch_X[i]]
         if noise:
@@ -270,19 +271,24 @@ def count_rewards(dull_loss, forward_entropy, backward_entropy, forward_target, 
 def train(training_type=config.training_type):
     global dull_set
 
+    #generating word to index, index to word and bias vector 
+    #lemmentizing the word to embedded system 
     wordtoix, ixtoword, bias_init_vector = data_parser.pre_build_word_vocab(word_count_threshold=word_count_threshold)
+        
     word_vector = KeyedVectors.load_word2vec_format('saver/word_vector.bin', binary=True)
-
+    
     if len(dull_set) > batch_size:
         dull_set = dull_set[:batch_size]
     else:
         for _ in range(len(dull_set), batch_size):
             dull_set.append('')
+    # generating dull sets of sentences
     dull_matrix, dull_mask = make_batch_Y(
                                 batch_Y=dull_set, 
                                 wordtoix=wordtoix, 
                                 n_decode_lstm_step=n_decode_lstm_step)
 
+    # reward initializes
     ones_reward = np.ones([batch_size, n_decode_lstm_step])
 
     g1 = tf.Graph()
@@ -302,17 +308,20 @@ def train(training_type=config.training_type):
                 lr=learning_rate)
         train_op, loss, input_tensors, inter_value = model.graph_model()
         tf_states, tf_actions, tf_feats = model.build_generator()
-        sess = tf.InteractiveSession()
+        sess = tf.Session()
         saver = tf.train.Saver(max_to_keep=100)
-        if checkpoint:
-            print("Use Model {}.".format(model_name))
+                
+
+        if os.path.exists(os.path.join(model_path,model_name)):
+            print("previous RL-model found")
+            print("Restoring the model from {}  .....".format(model_name))
             saver.restore(sess, os.path.join(model_path, model_name))
             print("Model {} restored.".format(model_name))
         else:
             print("Restart training...")
-            tf.global_variables_initializer().run()
-
+    
     r_wordtoix, r_ixtoword, r_bias_init_vector = data_parser.pre_build_word_vocab(word_count_threshold=r_word_count_threshold)
+    
     with g2.as_default():
         reversed_model = seq2seq_chatbot(
             dim_wordvec=dim_wordvec,
@@ -325,159 +334,185 @@ def train(training_type=config.training_type):
             lr=learning_rate)
         _, _, word_vectors, caption, caption_mask, reverse_inter = reversed_model.graph_model()
         sess2 = tf.InteractiveSession()
-        saver2 = tf.train.Saver()
-        saver2.restore(sess2, os.path.join(reversed_model_path, reversed_model_name))
-        print("Reversed model {} restored.".format(reversed_model_name))
+        if os.path.exists(os.path.join(reversed_model_path,reversed_model_name)):
+            print("previous reversed model found")
+            print("Reversed model {} restored.".format(reversed_model_name))
+            # saver2= tf.train.Saver()
+            # saver2.restore(sess2,os.path.join(reversed_model_path, reversed_model_name))
 
     # fileWriter
     writer=tf.summary.FileWriter("./saver/summary/policy_gradient/")
-    writer.add_graph(g1)
-    writer_1=tf.summary.FileWriter("./saver/summary/seq2seq/")
-    writer_1.add_graph(g2)
-    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
-    # sess = tf.InteractiveSession()
-
-    dr = Data_Reader(cur_train_index=config.cur_train_index, load_list=config.load_list)
-
-    for epoch in range(start_epoch, epochs):
-        n_batch = dr.get_batch_num(batch_size)
-        sb = start_batch if epoch == start_epoch else 0
-        for batch in range(sb, n_batch):
-            start_time = time.time()
-
-            batch_X, batch_Y, former = dr.generate_training_batch_with_former(batch_size)
-
-            current_feats = make_batch_X(
-                            batch_X=copy.deepcopy(batch_X), 
-                            n_encode_lstm_step=n_encode_lstm_step, 
-                            dim_wordvec=dim_wordvec,
-                            word_vector=word_vector)
-
-            current_caption_matrix, current_caption_masks = make_batch_Y(
-                                                                batch_Y=copy.deepcopy(batch_Y), 
-                                                                wordtoix=wordtoix, 
-                                                                n_decode_lstm_step=n_decode_lstm_step)
-
-            if training_type == 'pg':
-                # action: generate batch_size sents
-                action_word_indexs, inference_feats = sess.run([tf_actions, tf_feats],
-                                                                feed_dict={
-                                                                   tf_states: current_feats
-                                                                })
-                action_word_indexs = np.array(action_word_indexs).reshape(batch_size, n_decode_lstm_step)
-                action_probs = np.array(inference_feats['probs']).reshape(batch_size, n_decode_lstm_step, -1)
-
-                actions = []
-                actions_list = []
-                for i in range(len(action_word_indexs)):
-                    action = index2sentence(
-                                generated_word_index=action_word_indexs[i], 
-                                prob_logit=action_probs[i],
-                                ixtoword=ixtoword)
-                    actions.append(action)
-                    actions_list.append(action.split())
-
-                action_feats = make_batch_X(
-                                batch_X=copy.deepcopy(actions_list), 
-                                n_encode_lstm_step=n_encode_lstm_step, 
-                                dim_wordvec=dim_wordvec,
-                                word_vector=word_vector)
-
-                action_caption_matrix, action_caption_masks = make_batch_Y(
-                                                                batch_Y=copy.deepcopy(actions), 
-                                                                wordtoix=wordtoix, 
-                                                                n_decode_lstm_step=n_decode_lstm_step)
-
-                # ease of answering
-                dull_loss = []
-                for vector in action_feats:
-                    action_batch_X = np.array([vector for _ in range(batch_size)])
-                    d_loss = sess.run(loss,
-                                 feed_dict={
-                                    input_tensors['word_vectors']: action_batch_X,
-                                    input_tensors['caption']: dull_matrix,
-                                    input_tensors['caption_mask']: dull_mask,
-                                    input_tensors['reward']: ones_reward
-                                })
-                    d_loss = d_loss * -1. / len(dull_set)
-                    dull_loss.append(d_loss)
-
-                # Information Flow
-                pass
-
-                # semantic coherence
-                forward_inter = sess.run(inter_value,
-                                 feed_dict={
-                                    input_tensors['word_vectors']: current_feats,
-                                    input_tensors['caption']: action_caption_matrix,
-                                    input_tensors['caption_mask']: action_caption_masks,
-                                    input_tensors['reward']: ones_reward
-                                })
-                forward_entropies = forward_inter['entropies']
-                former_caption_matrix, former_caption_masks = make_batch_Y(
-                                                                batch_Y=copy.deepcopy(former), 
-                                                                wordtoix=wordtoix, 
-                                                                n_decode_lstm_step=n_decode_lstm_step)
-                action_feats = make_batch_X(
-                                batch_X=copy.deepcopy(actions_list), 
-                                n_encode_lstm_step=r_n_encode_lstm_step, 
-                                dim_wordvec=dim_wordvec,
-                                word_vector=word_vector)
-                backward_inter = sess2.run(reverse_inter,
-                                 feed_dict={
-                                    word_vectors: action_feats,
-                                    caption: former_caption_matrix,
-                                    caption_mask: former_caption_masks
-                                })
-                backward_entropies = backward_inter['entropies']
-
-                # reward: count goodness of actions
-                rewards = count_rewards(dull_loss, forward_entropies, backward_entropies, actions, former, reward_type='pg')
+    # writer.add_graph(g1)
+    writer_2=tf.summary.FileWriter("./saver/summary/reverse/")
+    # writer_1.add_graph(g2)
     
-                # policy gradient: train batch with rewards
-                if batch % 10 == 0:
-                    _, loss_val = sess.run(
-                            [train_op, loss],
-                            feed_dict={
-                                input_tensors['word_vectors']: current_feats,
-                                input_tensors['caption']: current_caption_matrix,
-                                input_tensors['caption_mask']: current_caption_masks,
-                                input_tensors['reward']: rewards
-                            })
-                    print("Epoch: {}, batch: {}, loss: {}, Elapsed time: {}".format(epoch, batch, loss_val, time.time() - start_time))
-                else:
-                    _ = sess.run(train_op,
-                                 feed_dict={
-                                    input_tensors['word_vectors']: current_feats,
-                                    input_tensors['caption']: current_caption_matrix,
-                                    input_tensors['caption_mask']: current_caption_masks,
-                                    input_tensors['reward']: rewards
-                                })
-                if batch % 1000 == 0 and batch != 0:
-                    print("Epoch {} batch {} is done. Saving the model ...".format(epoch, batch))
-                    saver.save(sess, os.path.join(model_path, 'model-{}-{}'.format(epoch, batch)))
-            if training_type == 'normal':
-                if batch % 10 == 0:
-                    _, loss_val = sess.run(
-                            [train_op, loss],
-                            feed_dict={
-                                input_tensors['word_vectors']: current_feats,
-                                input_tensors['caption']: current_caption_matrix,
-                                input_tensors['caption_mask']: current_caption_masks,
-                                input_tensors['reward']: ones_reward
-                            })
-                    print("Epoch: {}, batch: {}, loss: {}, Elapsed time: {}".format(epoch, batch, loss_val, time.time() - start_time))
-                else:
-                    _ = sess.run(train_op,
-                                 feed_dict={
-                                    input_tensors['word_vectors']: current_feats,
-                                    input_tensors['caption']: current_caption_matrix,
-                                    input_tensors['caption_mask']: current_caption_masks,
-                                    input_tensors['reward']: ones_reward
-                                })
+    # for gpu option
+    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+    
 
-        print("Epoch ", epoch, " is done. Saving the model ...")
+    # reading from the data
+    dr = Data_Reader(cur_train_index=config.cur_train_index, load_list=config.load_list)
+    os.system('clear')
+    print("Training started")
+    # ============================Trainning============================
+    try:
+        with sess as sess:
+            sess.run(tf.global_variables_initializer())
+            for epoch in range(start_epoch, epochs):
+                n_batch = dr.get_batch_num(batch_size)
+                sb = start_batch if epoch == start_epoch else 0
+                # for each trainnin batch
+                for batch in range(sb, n_batch):
+                    start_time = time.time()
+                    
+                    # generating batch data 
+                    batch_X, batch_Y, former = dr.generate_training_batch_with_former(batch_size)
+                
+
+                    current_feats = make_batch_X(
+                                    batch_X=copy.deepcopy(batch_X), 
+                                    n_encode_lstm_step=n_encode_lstm_step, 
+                                    dim_wordvec=dim_wordvec,
+                                    word_vector=word_vector)
+            
+                    current_caption_matrix, current_caption_masks = make_batch_Y(
+                                                                        batch_Y=copy.deepcopy(batch_Y), 
+                                                                        wordtoix=wordtoix, 
+                                                                        n_decode_lstm_step=n_decode_lstm_step)
+
+                    if training_type == 'pg':
+                        # action: generate batch_size sents
+                        action_word_indexs, inference_feats = sess.run([tf_actions, tf_feats],
+                                                                        feed_dict={
+                                                                        tf_states: current_feats
+                                                                        })
+                        action_word_indexs = np.array(action_word_indexs).reshape(batch_size, n_decode_lstm_step)
+                        action_probs = np.array(inference_feats['probs']).reshape(batch_size, n_decode_lstm_step, -1)
+
+                        actions = []
+                        actions_list = []
+                        for i in range(len(action_word_indexs)):
+                            action = index2sentence(
+                                        generated_word_index=action_word_indexs[i], 
+                                        prob_logit=action_probs[i],
+                                        ixtoword=ixtoword)
+                            actions.append(action)
+                            actions_list.append(action.split())
+
+                        action_feats = make_batch_X(
+                                        batch_X=copy.deepcopy(actions_list), 
+                                        n_encode_lstm_step=n_encode_lstm_step, 
+                                        dim_wordvec=dim_wordvec,
+                                        word_vector=word_vector)
+
+                        action_caption_matrix, action_caption_masks = make_batch_Y(
+                                                                        batch_Y=copy.deepcopy(actions), 
+                                                                        wordtoix=wordtoix, 
+                                                                        n_decode_lstm_step=n_decode_lstm_step)
+
+                        # ease of answering
+                        dull_loss = []
+                        for vector in action_feats:
+                            action_batch_X = np.array([vector for _ in range(batch_size)])
+                            d_loss = sess.run(loss,
+                                        feed_dict={
+                                            input_tensors['word_vectors']: action_batch_X,
+                                            input_tensors['caption']: dull_matrix,
+                                            input_tensors['caption_mask']: dull_mask,
+                                            input_tensors['reward']: ones_reward
+                                        })
+                            d_loss = d_loss * -1. / len(dull_set)
+                            dull_loss.append(d_loss)
+
+                        # Information Flow
+                        pass
+
+                        # semantic coherence
+                        forward_inter = sess.run(inter_value,
+                                        feed_dict={
+                                            input_tensors['word_vectors']: current_feats,
+                                            input_tensors['caption']: action_caption_matrix,
+                                            input_tensors['caption_mask']: action_caption_masks,
+                                            input_tensors['reward']: ones_reward
+                                        })
+                        forward_entropies = forward_inter['entropies']
+                        former_caption_matrix, former_caption_masks = make_batch_Y(
+                                                                        batch_Y=copy.deepcopy(former), 
+                                                                        wordtoix=wordtoix, 
+                                                                        n_decode_lstm_step=n_decode_lstm_step)
+                        action_feats = make_batch_X(
+                                        batch_X=copy.deepcopy(actions_list), 
+                                        n_encode_lstm_step=r_n_encode_lstm_step, 
+                                        dim_wordvec=dim_wordvec,
+                                        word_vector=word_vector)
+                    
+                        backward_inter = sess2.run(reverse_inter,
+                                        feed_dict={
+                                            word_vectors: action_feats,
+                                            caption: former_caption_matrix,
+                                            caption_mask: former_caption_masks
+                                        })
+                        backward_entropies = backward_inter['entropies']
+
+                        # reward: count goodness of actions
+                        rewards = count_rewards(dull_loss, forward_entropies, backward_entropies, actions, former, reward_type='pg')
+            
+                        # policy gradient: train batch with rewards
+                        if batch % 10 == 0:
+                            _, loss_val = sess.run(
+                                    [train_op, loss],
+                                    feed_dict={
+                                        input_tensors['word_vectors']: current_feats,
+                                        input_tensors['caption']: current_caption_matrix,
+                                        input_tensors['caption_mask']: current_caption_masks,
+                                        input_tensors['reward']: rewards
+                                    })
+                            print("Epoch: {}, batch: {}, loss: {}, Elapsed time: {}".format(epoch, batch, loss_val, time.time() - start_time))
+                        else:
+                            _ = sess.run(train_op,
+                                        feed_dict={
+                                            input_tensors['word_vectors']: current_feats,
+                                            input_tensors['caption']: current_caption_matrix,
+                                            input_tensors['caption_mask']: current_caption_masks,
+                                            input_tensors['reward']: rewards
+                                        })
+                        # if batch % 1000 == 0 and batch != 0:
+                        print("Epoch {} batch {} is done.".format(epoch, batch))
+                        #     saver.save(sess, os.path.join(model_path, 'model-{}-{}'.format(epoch, batch)))
+                    if training_type == 'normal':
+                        if batch % 10 == 0:
+                            _, loss_val = sess.run(
+                                    [train_op, loss],
+                                    feed_dict={
+                                        input_tensors['word_vectors']: current_feats,
+                                        input_tensors['caption']: current_caption_matrix,
+                                        input_tensors['caption_mask']: current_caption_masks,
+                                        input_tensors['reward']: ones_reward
+                                    })
+                            print("Epoch: {}, batch: {}, loss: {}, Elapsed time: {}".format(epoch, batch, loss_val, time.time() - start_time))
+                        else:
+                            _ = sess.run(train_op,
+                                        feed_dict={
+                                            input_tensors['word_vectors']: current_feats,
+                                            input_tensors['caption']: current_caption_matrix,
+                                            input_tensors['caption_mask']: current_caption_masks,
+                                            input_tensors['reward']: ones_reward
+                                        })
+
+                print("Epoch ", epoch, " is done.")
+                # saver.save(sess, os.path.join(model_path, 'model'), global_step=epoch)
+
+    except(KeyboardInterrupt,SystemExit):
+        print("Interruption detected,exiting program.........")
         saver.save(sess, os.path.join(model_path, 'model'), global_step=epoch)
+    # ===========================Finish Training======================
+    print ("Complete the training storing model {}".format(model_name))
+    print ("Saving model ............")
+    saver.save(sess, os.path.join(model_path, 'model'))
+    print ("Finish Saving exiting program ......")
+
+def seq2seq_train():
+    pass
 
 if __name__ == "__main__":
     train()

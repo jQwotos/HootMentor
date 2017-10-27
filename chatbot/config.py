@@ -1,5 +1,5 @@
 # path to training data
-training_data_path = './data/conversations_lenmax22_formersents2_with_former'
+training_data_path = 'data/conversations_lenmax22_formersents2_with_former'
 filters = "+++$+++"
 
 # path to all_words
@@ -7,8 +7,8 @@ all_words_path = './data/all_words.txt'
 
 # training parameters 
 CHECKPOINT = False
-train_model_path = 'saver/RL'
-train_model_name = 'model-56-3000'
+train_model_path = 'saver/model/RL/'
+train_model_name = 'model-RL'
 start_epoch = 56
 start_batch = 0
 batch_size = 25

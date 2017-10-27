@@ -1,6 +1,6 @@
 
 # Directories and files to ignore when uploading code to floyd
-
+__pycache__
 .git
 .eggs
 eggs
@@ -12,3 +12,4 @@ var
 *.pyc
 *.swp
 .DS_Store
+./saver/summary/
