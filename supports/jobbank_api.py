@@ -21,7 +21,8 @@ REPORT_URL = '%sreport-eng.do' % (BASE_URL,)
 report_params = {
     'area': '25565',
     'lang': 'eng',
-    'ln': 'n'
+    'ln': 'n',
+    'action': 'final',
 }
 
 requests_toolbelt.adapters.appengine.monkeypatch()
@@ -169,10 +170,14 @@ def scrape_report_wages(*noc_code):
     report_params['s'] = '1'
     if len(noc_code) > 0:
         report_params['noc'] = noc_code[0]
+    print('Sending request for report wages for %s' % (report_params['noc'],))
+    print(REPORT_URL)
+    print(report_params)
     data = bs(requests.get(
         REPORT_URL,
         params=report_params
     ).content)
+    print('Finished request for report wages for %s' % (report_params['noc'],))
     table = data.find('table', {'id': 'natwagetable'})
     if table is not None:
         return _parse_wage_table(table)
