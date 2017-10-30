@@ -1,6 +1,6 @@
 import hashlib
 
-PASSWORD = "d210ae60501cc5e4df5e5dbf094af2ae150b4ce03b2ca67c827656d58a0866e1"
+PASSWORD = "8276a624bc555994a749f9160b5043875d98d6810dd20008a439e32b07d74a38"
 
 
 def verify(plain_text):

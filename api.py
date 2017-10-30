@@ -1,4 +1,5 @@
 import logging
+import json
 
 import endpoints
 
@@ -8,6 +9,7 @@ from protorpc import remote
 
 import supports.jobbank_api as jbapi
 import supports.risk_api as rkapi
+import supports.crypto_verify as crypto
 
 
 class JobSearchRequest(messages.Message):
@@ -78,6 +80,22 @@ class JobSearchApi(remote.Service):
         recieved = str(request.content)
         result = rkapi.nocRisk(recieved)
         output_content = ' '.join([str(result)] * request.n)
+        return JobSearchResponse(content=output_content)
+
+    @endpoints.method(
+        JOB_RESOURCE,
+        JobSearchResponse,
+        path='jobSearch/dbAdd',
+        http_method='POST',
+        name='db_add')
+    def db_add(self, request):
+        recieved = json.loads(request.content)
+        if crypto.verify(recieved.get('password')):
+            rkapi.add_multi_db(recieved.get('data'))
+            result = 'Successfully added data points!'
+        else:
+            result = 'Falsed to verify key.'
+        output_content = ' '.join([result] * request.n)
         return JobSearchResponse(content=output_content)
 
 api = endpoints.api_server([JobSearchApi])

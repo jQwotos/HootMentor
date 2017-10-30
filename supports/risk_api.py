@@ -38,7 +38,7 @@ def add_multi_db(items):
     ]
     itemObjs = []
     for item in items:
-        if item is not on current:
+        if item not in current:
             itemObjs.append(
                 JobRisk(
                     noc_code = item.get('noc'),
