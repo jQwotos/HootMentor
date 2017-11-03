@@ -23,9 +23,9 @@ def _noc_risk_db(noc_code):
 
 
 def noc_risk(noc_code):
-    dbRisk = _nocRiskDB(noc_code)
-    if dbEntry is not None:
-        return dbEntry
+    dbRisk = _noc_risk_db(noc_code)
+    if dbRisk is not None:
+        return dbRisk
     else:
         return '0'
 

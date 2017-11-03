@@ -8,7 +8,7 @@ from key import key
 
 FILE = '../data/automation.csv'
 
-BASE_URL = 'http://localhost:8080'
+BASE_URL = 'https://hoot-mentor.appspot.com'
 DB_ADD_URL = '%s/_ah/api/jobSearch/v1/jobSearch/dbAdd' % BASE_URL
 
 def gather_data():

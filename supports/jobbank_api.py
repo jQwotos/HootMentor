@@ -149,7 +149,7 @@ def find_similar(query_string):
     return None
 
 def clean_text(text):
-    return re.sub('\s\s+', '', text)
+    return str(re.sub('\s\s+', '', text))
 
 def _parse_wage_row(row):
     wages = row.findAll('td', {'headers': 'header2_wages_nat'})

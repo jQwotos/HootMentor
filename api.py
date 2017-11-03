@@ -78,7 +78,7 @@ class JobSearchApi(remote.Service):
         name='noc_risk')
     def noc_risk(self, request):
         recieved = str(request.content)
-        result = rkapi.nocRisk(recieved)
+        result = rkapi.noc_risk(recieved)
         output_content = ' '.join([str(result)] * request.n)
         return JobSearchResponse(content=output_content)
 
