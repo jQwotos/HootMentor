@@ -13,5 +13,4 @@ POSTING_URL = '%sProfileQuickSearch.aspx' % (BASE_URL,)
 
 
 def noc_code_to_title(noc_code):
-    request = requests.get()
     

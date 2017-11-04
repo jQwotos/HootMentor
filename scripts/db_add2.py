@@ -6,17 +6,17 @@ import csv
 from key import key
 
 
-FILE = '../data/automation.csv'
+FILE = '../data/data.csv'
 
-BASE_URL = 'http://127.0.0.1:8080'
-DB_ADD_URL = '%s/_ah/api/jobSearch/v1/jobSearch/dbAdd' % BASE_URL
+BASE_URL = 'https://hoot-mentor.appspot.com'
+DB_ADD_URL = '%s/_ah/api/jobSearch/v1/jobSearch/dbAddNoc' % BASE_URL
 
 def gather_data():
     with open(FILE) as csvfile:
         readCSV = csv.reader(csvfile, delimiter=',')
         return [{
                     'noc': x[0],
-                    'automation_risk': x[1]
+                    'title': x[1]
                 }
                 for x in readCSV
         ]

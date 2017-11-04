@@ -10,6 +10,9 @@ from protorpc import remote
 import supports.jobbank_api as jbapi
 import supports.risk_api as rkapi
 import supports.crypto_verify as crypto
+from supports.database import NocJob
+
+from google.appengine.ext import ndb
 
 
 class JobSearchRequest(messages.Message):
@@ -85,6 +88,20 @@ class JobSearchApi(remote.Service):
     @endpoints.method(
         JOB_RESOURCE,
         JobSearchResponse,
+        path='jobSearch/nocCodeToTitle',
+        http_method='POST',
+        name='noc_code_to_title')
+    def noc_code_to_title(self, request):
+        received = str(request.content)
+        result = NocJob.query(
+            NocJob.noc_code == received
+        ).fetch(1)[0].title
+        output_content = ' '.join([str(result)] * request.n)
+        return JobSearchResponse(content=output_content)
+
+    @endpoints.method(
+        JOB_RESOURCE,
+        JobSearchResponse,
         path='jobSearch/dbAdd',
         http_method='POST',
         name='db_add')
@@ -97,5 +114,29 @@ class JobSearchApi(remote.Service):
             result = 'Falsed to verify key.'
         output_content = ' '.join([result] * request.n)
         return JobSearchResponse(content=output_content)
+    @endpoints.method(
+        JOB_RESOURCE,
+        JobSearchResponse,
+        path='jobSearch/dbAddNoc',
+        http_method='POST',
+        name='db_add_noc')
+    def db_add_noc(self, request):
+        recieved = json.loads(request.content)
+        if crypto.verify(recieved.get('password')):
+            # rkapi.add_multi_db(recieved.get('data'))
+            itemObjs = []
+            for item in recieved.get('data'):
+                itemObjs.append(
+                    NocJob(
+                        noc_code = item.get('noc'),
+                        title = item.get('title')
+                    ))
+            ndb.put_multi(itemObjs)
+            result = 'Successfully added data points!'
+        else:
+            result = 'Falsed to verify key.'
+        output_content = ' '.join([result] * request.n)
+        return JobSearchResponse(content=output_content)
+
 
 api = endpoints.api_server([JobSearchApi])

@@ -75,6 +75,15 @@ def search(query_string, **properties):
         return data
     return None
 
+def noc_to_title(query_string):
+    pat = r'<\!\[CDATA\[(.*)]]>'
+    data = search(query_string)
+    all_postings = data.findAll('entry')
+    if len(all_postings) > 0:
+        leading_entry = all_postings[0]
+        title = leading_entry.find('title').text
+        return re.findall(pat, title)[0]
+
 
 def _cached_job_number_to_noc(job_number):
     # Uses the stored database to find
