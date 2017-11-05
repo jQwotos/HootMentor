@@ -22,6 +22,10 @@ import tensorflow as tf
 import numpy as np
 import math
 
+tf_config = tf.ConfigProto()
+tf_config.intra_op_parallelism_threads = 44
+tf_config.inter_op_parallelism_threads = 44
+
 
 ### Global Parameters ###
 model_path = config.train_model_path
@@ -296,6 +300,11 @@ def train(training_type=config.training_type):
     g2 = tf.Graph()
 
     default_graph = tf.get_default_graph() 
+    
+    # for gpu option
+    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+    # config = tf.ConfigProto(gpu_options=gpu_options)
+    # config.gpu_options.allocate_type= 'BFC'
 
     with g1.as_default():
         model = PolicyGradient_chatbot(
@@ -309,13 +318,13 @@ def train(training_type=config.training_type):
                 lr=learning_rate)
         train_op, loss, input_tensors, inter_value = model.graph_model()
         tf_states, tf_actions, tf_feats = model.build_generator()
-        sess = tf.Session()
-        saver = tf.train.Saver(max_to_keep=100)
+        sess = tf.Session(config=tf_config)
+        
                 
-
-        if os.path.exists(os.path.join(model_path,model_name)):
+        if os.path.exists(os.path.join(model_path,model_name+".meta")):
             print("previous RL-model found")
             print("Restoring the model from {}  .....".format(model_name))
+            saver = tf.train.import_meta_graph(os.path.join(model_path,model_name))
             saver.restore(sess, os.path.join(model_path, model_name))
             print("Model {} restored.".format(model_name))
         else:
@@ -334,20 +343,19 @@ def train(training_type=config.training_type):
             bias_init_vector=r_bias_init_vector,
             lr=learning_rate)
         _, _, word_vectors, caption, caption_mask, reverse_inter = reversed_model.graph_model()
-        sess2 = tf.InteractiveSession()
+        sess2 = tf.Session(config=tf_config)
         # reversed model is mandatory 
-        print("Reversed model {} restored.".format(reversed_model_name))
-        saver2= tf.train.Saver()
+        saver2= tf.train.import_meta_graph(os.path.join(reversed_model_path,reversed_model_name+".meta"))
         saver2.restore(sess2,os.path.join(reversed_model_path, reversed_model_name))
-
+        print("Reversed model {} restored.".format(reversed_model_name))
+   
+    sys.exit(0)
     # fileWriter
-    writer=tf.summary.FileWriter("./saver/summary/policy_gradient/",sess.grap)
+    writer=tf.summary.FileWriter("./saver/summary/policy_gradient/",sess.graph)
     # writer.add_graph(g1)
     writer_2=tf.summary.FileWriter("./saver/summary/reverse/",sess2.graph)
     # writer_1.add_graph(g2)
     
-    # for gpu option
-    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
     
 
     # reading from the data
@@ -364,7 +372,7 @@ def train(training_type=config.training_type):
                 # for each trainnin batch
                 for batch in range(sb, n_batch):
                     start_time = time.time()
-                    
+                    sys.exit(0)
                     # generating batch data 
                     batch_X, batch_Y, former = dr.generate_training_batch_with_former(batch_size)
                 
@@ -478,7 +486,9 @@ def train(training_type=config.training_type):
                                         })
                         # if batch % 1000 == 0 and batch != 0:
                         print("Epoch {} batch {} is done.".format(epoch, batch))
-                        #     saver.save(sess, os.path.join(model_path, 'model-{}-{}'.format(epoch, batch)))
+                        if batch % 1000 == 0 and batch !=0:
+                            print ("Epoch {} batch {} is done. saving model....".format(epoch,batche))
+                            saver.save(sess, os.path.join(model_path, 'model-{}-{}'.format(epoch, batch)))
                     if training_type == 'normal':
                         if batch % 10 == 0:
                             _, loss_val = sess.run(
@@ -499,8 +509,8 @@ def train(training_type=config.training_type):
                                             input_tensors['reward']: ones_reward
                                         })
 
-                print("Epoch ", epoch, " is done.")
-                # saver.save(sess, os.path.join(model_path, 'model'), global_step=epoch)
+                print("Epoch ", epoch, " is done. Saving the model ......")
+                saver.save(sess, os.path.join(model_path, 'rl_model'), global_step=epoch)
 
     except(KeyboardInterrupt,SystemExit):
         print("Interruption detected,exiting program.........")
@@ -524,7 +534,7 @@ def seq2seq_train():
             n_decode_lstm_step=n_decode_lstm_step,
             bias_init_vector=bias_init_vector,
             lr=learning_rate)
-
+    os.system("clear")
     train_op, tf_loss, word_vectors, tf_caption, tf_caption_mask, inter_value = model.graph_model()
 
     saver = tf.train.Saver(max_to_keep=100)
@@ -533,101 +543,107 @@ def seq2seq_train():
     # sess = tf.InteractiveSession()
     sess=tf.Session()
 
-
-    if os.path.exists(os.path.join(reversed_model_path,reversed_model_name)):
-        print("Use Model {}.".format(reversed_model_name))
-        saver.restore(sess, os.path.join(reversed_model_path, model_name))
-        print("Model {} restored.".format(model_name))
-    else:        
-        print("Restart training...")
+    print("Use Model {}.".format(reversed_model_name))
+    saver.restore(sess, os.path.join(reversed_model_path, model_name))
+    print("Model {} restored.".format(model_name))
+    # if os.path.exists(os.path.join(reversed_model_path,"checkpoint")):
+    #     print("Use Model {}.".format(reversed_model_name))
+    #     saver.restore(sess, os.path.join(reversed_model_path, model_name))
+    #     print("Model {} restored.".format(model_name))
+    # else:        
+    #     print("Restart training...")
 
     dr = Data_Reader()
+    with sess as sess:
+        try :
+            sess.run(tf.global_variables_initializer())
+            for epoch in range(start_epoch, epochs):
+                n_batch = dr.get_batch_num(batch_size)
+                for batch in range(n_batch):
+                    start_time = time.time()
 
-    with sess as sess: 
-        sess.run(tf.global_variables_initializer())
-        builder = tf.saved_model.builder.SavedModelBuilder(os.path.join(reversed_model_path,save_model_path))
-        for epoch in range(start_epoch, epochs):
-            n_batch = dr.get_batch_num(batch_size)
-            for batch in range(n_batch):
-                start_time = time.time()
+                    batch_X, batch_Y = dr.generate_training_batch(batch_size)
 
-                batch_X, batch_Y = dr.generate_training_batch(batch_size)
-
-                for i in range(len(batch_X)):
-                    batch_X[i] = [word_vector[w] if w in word_vector else np.zeros(dim_wordvec) for w in batch_X[i]]
-                    # batch_X[i].insert(0, np.random.normal(size=(dim_wordvec,))) # insert random normal at the first step
-                    if len(batch_X[i]) > n_encode_lstm_step:
-                        batch_X[i] = batch_X[i][:n_encode_lstm_step]
-                    else:
-                        for _ in range(len(batch_X[i]), n_encode_lstm_step):
-                            batch_X[i].append(np.zeros(dim_wordvec))
-
-                current_feats = np.array(batch_X)
-                # print('current_feats.shape', current_feats.shape)
-
-                current_captions = batch_Y
-                current_captions = list(map(lambda x: '<bos> ' + x, current_captions))
-                current_captions = list(map(lambda x: x.replace('.', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace(',', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace('"', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace('\n', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace('?', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace('!', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace('\\', ''), current_captions))
-                current_captions = list(map(lambda x: x.replace('/', ''), current_captions))
-
-                for idx, each_cap in enumerate(current_captions):
-                    word = each_cap.lower().split(' ')
-                    if len(word) < n_decode_lstm_step:
-                        current_captions[idx] = current_captions[idx] + ' <eos>'
-                    else:
-                        new_word = ''
-                        for i in range(n_decode_lstm_step-1):
-                            new_word = new_word + word[i] + ' '
-                        current_captions[idx] = new_word + '<eos>'
-
-                current_caption_ind = []
-                for cap in current_captions:
-                    current_word_ind = []
-                    for word in cap.lower().split(' '):
-                        if word in wordtoix:
-                            current_word_ind.append(wordtoix[word])
+                    for i in range(len(batch_X)):
+                        batch_X[i] = [word_vector[w] if w in word_vector else np.zeros(dim_wordvec) for w in batch_X[i]]
+                        if i==0:
+                            batch_X[i].insert(0, np.random.normal(size=(dim_wordvec,))) # insert random normal at the first step
+                        if len(batch_X[i]) > n_encode_lstm_step:
+                            batch_X[i] = batch_X[i][:n_encode_lstm_step]
                         else:
-                            current_word_ind.append(wordtoix['<unk>'])
-                    current_caption_ind.append(current_word_ind)
+                            for _ in range(len(batch_X[i]), n_encode_lstm_step):
+                                batch_X[i].append(np.zeros(dim_wordvec))
 
-                current_caption_matrix = pad_sequences(current_caption_ind, padding='post', maxlen=n_decode_lstm_step)
-                current_caption_matrix = np.hstack([current_caption_matrix, np.zeros([len(current_caption_matrix), 1])]).astype(int)
-                current_caption_masks = np.zeros((current_caption_matrix.shape[0], current_caption_matrix.shape[1]))
-                nonzeros = np.array(list(map(lambda x: (x != 0).sum() + 1, current_caption_matrix)))
+                    current_feats = np.array(batch_X)
+                    # print('current_feats.shape', current_feats.shape)
 
-                for ind, row in enumerate(current_caption_masks):
-                    row[:nonzeros[ind]] = 1
+                    current_captions = batch_Y
+                    current_captions = list(map(lambda x: '<bos> ' + x, current_captions))
+                    current_captions = list(map(lambda x: x.replace('.', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace(',', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace('"', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace('\n', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace('?', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace('!', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace('\\', ''), current_captions))
+                    current_captions = list(map(lambda x: x.replace('/', ''), current_captions))
 
-                if batch % 100 == 0:
-                    _, loss_val = sess.run(
-                            [train_op, tf_loss],
-                            feed_dict={
-                                word_vectors: current_feats,
-                                tf_caption: current_caption_matrix,
-                                tf_caption_mask: current_caption_masks
-                            })
-                    print("Epoch: {}, batch: {}, loss: {}, Elapsed time: {}".format(epoch, batch, loss_val, time.time() - start_time))
-                else:
-                    _ = sess.run(train_op,
+                    for idx, each_cap in enumerate(current_captions):
+                        word = each_cap.lower().split(' ')
+                        if len(word) < n_decode_lstm_step:
+                            current_captions[idx] = current_captions[idx] + ' <eos>'
+                        else:
+                            new_word = ''
+                            for i in range(n_decode_lstm_step-1):
+                                new_word = new_word + word[i] + ' '
+                            current_captions[idx] = new_word + '<eos>'
+
+                    current_caption_ind = []
+                    for cap in current_captions:
+                        current_word_ind = []
+                        for word in cap.lower().split(' '):
+                            if word in wordtoix:
+                                current_word_ind.append(wordtoix[word])
+                            else:
+                                current_word_ind.append(wordtoix['<unk>'])
+                        current_caption_ind.append(current_word_ind)
+
+                    current_caption_matrix = pad_sequences(current_caption_ind, padding='post', maxlen=n_decode_lstm_step)
+                    current_caption_matrix = np.hstack([current_caption_matrix, np.zeros([len(current_caption_matrix), 1])]).astype(int)
+                    current_caption_masks = np.zeros((current_caption_matrix.shape[0], current_caption_matrix.shape[1]))
+                    nonzeros = np.array(list(map(lambda x: (x != 0).sum() + 1, current_caption_matrix)))
+
+                    for ind, row in enumerate(current_caption_masks):
+                        row[:nonzeros[ind]] = 1
+
+                    if batch % 100 == 0:
+                        _, loss_val = sess.run(
+                                [train_op, tf_loss],
                                 feed_dict={
                                     word_vectors: current_feats,
                                     tf_caption: current_caption_matrix,
                                     tf_caption_mask: current_caption_masks
                                 })
+                        print("Epoch: {}, batch: {}, loss: {}, Elapsed time: {}".format(epoch, batch, loss_val, time.time() - start_time))
+                    else:
+                        _ = sess.run(train_op,
+                                    feed_dict={
+                                        word_vectors: current_feats,
+                                        tf_caption: current_caption_matrix,
+                                        tf_caption_mask: current_caption_masks
+                                    })
 
-            print("Epoch ", epoch, " is done.")
-            builder.add_meta_graph_and_variables(sess, ["Training"])
-        builder.save()
-        tf.train.SummaryWriter(os.path.join(reversed_model_path,reversed_model_name+"/log/"),sess.graph)
-        saver.save(sess,os.path.join(reversed_model_path,reversed_model_name))
-
+                print("Epoch ", epoch, " is done.")
+                if batch % 1000 == 0 and batch !=0:
+                    print ("Epoch {} batch {} is done. saving model....".format(epoch,batche))
+                    saver.save(sess, os.path.join(reversed_model_path,'model.ckpt'))
+            #  when everything is done 
+            tf.train.SummaryWriter(os.path.join(reversed_model_path,reversed_model_name+"/log/"),sess.graph)
+            saver.save(sess,os.path.join(reversed_model_path,reversed_model_name))
+        except(KeyboardInterrupt,SystemExit):
+            print ("Interruption occured saving the model .....")
+            saver.save(sess,os.path.join(reversed_model_path,'model.ckpt'))
+            
 if __name__ == "__main__":
-    os.system("python3 feature_extractor.py")
-    seq2seq_train()
+    train()
     

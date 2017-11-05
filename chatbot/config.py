@@ -7,19 +7,19 @@ all_words_path = './data/all_words.txt'
 
 # training parameters 
 
-train_model_path = 'saver/model/RL/'
-train_model_name = 'model-RL'
+train_model_path = './saver/model/RL/'
+train_model_name = 'model-56-3000'
 
-save_model_path= 'ouput/'
+save_model_path= "./saver/model/RL/"
 
-start_epoch = 56
+start_epoch = 0
 start_batch = 0
 batch_size = 25
 
 # for RL training
 training_type = 'pg' # 'normal' for seq2seq training, 'pg' for policy gradient
-reversed_model_path = 'saver/model/reversed'
-reversed_model_name = 'mode-Reversed'
+reversed_model_path = './saver/model/Reversed/'
+reversed_model_name = 'model-63'
 
 # data reader shuffle index list
 load_list = False
