@@ -1,5 +1,4 @@
 .vscode 
+./chatbot/__pycache__
 ./__pycache__/*.pyc
-.floydexpt
-.floydignore
 ./chatbot/saver/model/*
